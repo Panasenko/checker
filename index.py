@@ -16,11 +16,23 @@ class Main(object):
 
     def checkList(self, ioc_list):
         array_results = []
+        array_errors = []
 
         while ioc_list:
             results = self.ValidIOC.valid_iocs(ioc_list.pop(0))
+            # print(results)
+
+            if not results["status"]:
+                array_errors.append(results)
+                continue
+
             array_results.append(results)
-        return array_results
+
+        print(len(array_results),len(array_errors))
+        return {
+            "valid_error": array_errors,
+            "valid_success": array_results
+        }
 
     def start(self):
         file_path = self.option.opt_parser()
@@ -66,8 +78,9 @@ class ValidIOC(object):
         ip_pattern = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
         return bool(re.fullmatch(ip_pattern, ip))
 
-    def validate_sha256(self, hash_value):
-        sha256_pattern = r'^[a-fA-F0-9]{64}$'
+    def validate_hashes(self, hash_value):
+        sha256_pattern = '\b[A-Fa-f0-9]{32}\b|\b[A-Fa-f0-9]{40}\b|\b[A-Fa-f0-9]{64}\b'
+
         return bool(re.fullmatch(sha256_pattern, hash_value))
 
     def validate_domain(self, domain):
@@ -83,7 +96,7 @@ class ValidIOC(object):
             }
             return response
 
-        elif self.validate_sha256(option):
+        elif self.validate_hashes(option):
             response = {
                 "status": True,
                 "type": "hash",
@@ -103,7 +116,7 @@ class ValidIOC(object):
             response = {
                 "status": False,
                 "type": "None",
-                "object": "option"
+                "object": option
             }
             return response
 
@@ -112,32 +125,24 @@ class VirusTotal(object):
 
     @staticmethod
     def call_api_virustotal(url):
-       
         
-       return url
-        # headers = {
-        #     'x-apikey': API_KEY,
-        #     'accept': 'application/json'
-        # }
-        #
-        # try:
-        #     response = requests.get(url, headers=headers)
-        #
-        #     print(response.text)
-        #     return response.text
-        #
-        #
-        #
-        #     response_json = response.json()
-        #
-        #     if response.status_code == 200:
-        #         data = response_json['data']
-        #         return response_json
-        #     else:
-        #         print("Error occurred while checking the IP address.")
-        #
-        # except requests.exceptions.RequestException as e:
-        #     print("An error occurred during the request:", str(e))
+        headers = {
+            'x-apikey': API_KEY,
+            'accept': 'application/json'
+        }
+
+        try:
+            response = requests.get(url, headers=headers)
+            response_json = response.json()
+
+            if response.status_code == 200:
+                data = response_json['data']
+                return response_json
+            else:
+                print("Error occurred while checking the IP address.")
+
+        except requests.exceptions.RequestException as e:
+            print("An error occurred during the request:", str(e))
 
     @staticmethod
     def check_ip_vt(ip_address):

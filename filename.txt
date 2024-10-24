@@ -1,6 +1,2 @@
-172.16.254.1
-203.0.113.195
-my-awesome-website.net
-634438a50ae1990c4f8636801c410460
 school.edu
 panopticlick.eff.org
