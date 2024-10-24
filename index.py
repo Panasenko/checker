@@ -15,23 +15,30 @@ class Main(object):
         self.start()
 
     def checkList(self, ioc_list):
-        array_results = []
+
+        array_ip_adress = []
+        array_domains = []
+        array_files = []
+
         array_errors = []
 
         while ioc_list:
             results = self.ValidIOC.valid_iocs(ioc_list.pop(0))
-            # print(results)
 
-            if not results["status"]:
+            if results['type'] == 'domain' and results["status"]:
+                array_domains.append(results)
+            elif results['type'] == 'ip' and results["status"]:
+                array_ip_adress.append(results)
+            elif results['type'] == 'hash' and results["status"]:
+                array_files.append(results)
+            else:
                 array_errors.append(results)
-                continue
 
-            array_results.append(results)
 
-        print(len(array_results),len(array_errors))
+        # print(len(array_results),len(array_errors))
         return {
             "valid_error": array_errors,
-            "valid_success": array_results
+            "valid_success": [array_files, array_ip_adress, array_domains]
         }
 
     def start(self):
@@ -137,7 +144,7 @@ class VirusTotal(object):
 
             if response.status_code == 200:
                 data = response_json['data']
-                return response_json
+                return data
             else:
                 print("Error occurred while checking the IP address.")
 
@@ -147,17 +154,51 @@ class VirusTotal(object):
     @staticmethod
     def check_ip_vt(ip_address):
         url = BASE_URL_VT + '/ip_addresses/' + ip_address
-        return VirusTotal.call_api_virustotal(url)
+        results = VirusTotal.call_api_virustotal(url)
+
+        attr = results['attributes']
+        return {
+            'check_ip': ip_address,
+            'last_analise': attr['last_analysis_stats'],
+            'country': attr['country'],
+            'whois': attr['whois'],
+            'whois_date': attr['whois_date'],
+            'last_analysis_date': attr['last_analysis_date'],
+            'last_modification_date': attr['last_modification_date']
+        }
 
     @staticmethod
     def check_domain_vt(domain):
         url = BASE_URL_VT + '/domains/' + domain
-        return VirusTotal.call_api_virustotal(url)
+        results = VirusTotal.call_api_virustotal(url)
+        attr = results['attributes']
+        return {
+            'check_domain': domain,
+            'last_analise': attr['last_analysis_stats'],
+            'last_dns_records_date': attr['last_dns_records_date'],
+            'whois': attr['whois'],
+            'whois_date': attr['whois_date'],
+            'creation_date': attr['creation_date'],
+            'last_update_date': attr['last_update_date'],
+            'last_modification_date': attr['last_modification_date']
+        }
 
     @staticmethod
     def check_files_vt(file):
         url = BASE_URL_VT + '/files/' + file
-        return VirusTotal.call_api_virustotal(url)
+        results = VirusTotal.call_api_virustotal(url)
+        attr = results['attributes']
+        return {
+            'check_hash': file,
+            'last_analise': attr['last_analysis_stats'],
+            'sha256': attr['sha256'],
+            'md5': attr['md5'],
+            'sha1': attr['sha1'],
+            'type_tag': attr['type_tag'],
+            'first_seen_itw_date': attr['first_seen_itw_date'],
+            'last_submission_date': attr['last_submission_date'],
+            'last_modification_date': attr['last_modification_date']
+        }
 
 
 if __name__ == "__main__":
