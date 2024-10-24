@@ -1,26 +1,31 @@
-#!/bin/python3
-
-# import vt
-#
-# client = vt.Client("d6c516e8c532da2c8d10062de712d320f4f0b6da7de92b451a358d6617540f0a")
-# file = client.get_object("/files/44d88612fea8a8f36de82e1278abb02f")
-# print(file.size)
-# client.close()
+#!/bin/python3 
 
 import re
 import optparse
+import requests
+
+API_KEY = 'd6c516e8c532da2c8d10062de712d320f4f0b6da7de92b451a358d6617540f0a'
+BASE_URL_VT = 'https://www.virustotal.com/api/v3/'
 
 class Main(object):
 
     def __init__(self):
         self.option = Options()
-        self.checkFile = CheckFile()
+        self.ValidIOC = ValidIOC()
         self.start()
+
+    def checkList(self, ioc_list):
+        array_results = []
+
+        while ioc_list:
+            results = self.ValidIOC.valid_iocs(ioc_list.pop(0))
+            array_results.append(results)
+        return array_results
 
     def start(self):
         file_path = self.option.opt_parser()
-        ioc_list = self.checkFile.readFile(file_path)
-        self.checkFile.checkList(ioc_list)
+        ioc_list = self.ValidIOC.readFile(file_path)
+        print(self.checkList(ioc_list))
 
 
 class Options(object):
@@ -42,7 +47,7 @@ class Options(object):
         return options.file_path
 
 
-class CheckFile(object):
+class ValidIOC(object):
 
     def readFile(self, file_path):
         try:
@@ -50,8 +55,10 @@ class CheckFile(object):
                 ioc_list = file.read().splitlines()
                 print('Прочтено %s елементов' %len(ioc_list))
                 return ioc_list
+
         except FileNotFoundError:
             print("Файл не найден!")
+
         except IOError:
             print("Ошибка ввода-вывода!")
 
@@ -69,25 +76,83 @@ class CheckFile(object):
 
     def valid_iocs(self, option):
         if self.validate_ip(option):
-            return "определен ip " + option
+            response = {
+                "status": True,
+                "type": "ip",
+                "object": VirusTotal.check_ip_vt(option)
+            }
+            return response
+
         elif self.validate_sha256(option):
-            return "Определен хеш " + option
+            response = {
+                "status": True,
+                "type": "hash",
+                "object": VirusTotal.check_files_vt(option)
+            }
+            return response
+            
         elif self.validate_domain(option):
-            return "Определен домен " + option
+            response = {
+                "status": True,
+                "type": "domain",
+                "object": VirusTotal.check_domain_vt(option)
+            }
+            return response
+
         else:
-            return "Неверный выбор"
-
-    def checkList(self, ioc_list):
-        while ioc_list:
-            print(self.valid_iocs(ioc_list.pop(0)))
-
-
-
+            response = {
+                "status": False,
+                "type": "None",
+                "object": "option"
+            }
+            return response
 
 
+class VirusTotal(object):
 
+    @staticmethod
+    def call_api_virustotal(url):
+       
+        
+       return url
+        # headers = {
+        #     'x-apikey': API_KEY,
+        #     'accept': 'application/json'
+        # }
+        #
+        # try:
+        #     response = requests.get(url, headers=headers)
+        #
+        #     print(response.text)
+        #     return response.text
+        #
+        #
+        #
+        #     response_json = response.json()
+        #
+        #     if response.status_code == 200:
+        #         data = response_json['data']
+        #         return response_json
+        #     else:
+        #         print("Error occurred while checking the IP address.")
+        #
+        # except requests.exceptions.RequestException as e:
+        #     print("An error occurred during the request:", str(e))
 
+    @staticmethod
+    def check_ip_vt(ip_address):
+        url = BASE_URL_VT + '/ip_addresses/' + ip_address
+        return VirusTotal.call_api_virustotal(url)
 
+    @staticmethod
+    def check_domain_vt(domain):
+        url = BASE_URL_VT + '/domains/' + domain
+        return VirusTotal.call_api_virustotal(url)
+
+    @staticmethod
+    def check_files_vt(file):
+        url = BASE_URL_VT + '/files/' + file
+        return VirusTotal.call_api_virustotal(url)
 
 
 if __name__ == "__main__":

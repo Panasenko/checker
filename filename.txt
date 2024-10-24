@@ -1,14 +1,6 @@
-192.168.0.1
-10.0.0.1
 172.16.254.1
-8.8.8.8
 203.0.113.195
-d2d2d2f5d2f5d2d5d7e8e8e8d9f9d9f9e0e0e0e7c7c7c7a6a6a6a7b5b5b5b6
-e3b0c44298fc1c149afbdee482fb2ed089abe4ae98e8bca5a51bb12ff2f2f800
-9b5c249eec76f8f0c5e3f75d71657b88822af5d6f9941e0db0c4d3fa331ff7b2
-a69f73cca23a9ac5c8b567dc185a756e97de34e4f99bc2fba230e7e10e21ed3f5
-example.com
-sub.example.org
-test-site.co.uk
 my-awesome-website.net
+634438a50ae1990c4f8636801c410460
 school.edu
+panopticlick.eff.org
