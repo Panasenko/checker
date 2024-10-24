@@ -1,11 +1,22 @@
 #!/bin/python3 
 
+import os
 import re
 import optparse
 import requests
+from dotenv import load_dotenv
 
-API_KEY = 'd6c516e8c532da2c8d10062de712d320f4f0b6da7de92b451a358d6617540f0a'
-BASE_URL_VT = 'https://www.virustotal.com/api/v3/'
+load_dotenv()
+
+# API_KEY = 'd6c516e8c532da2c8d10062de712d320f4f0b6da7de92b451a358d6617540f0a'
+# BASE_URL_VT = 'https://www.virustotal.com/api/v3/'
+
+API_KEY = os.getenv("API_KEY")
+BASE_URL_VT = os.getenv("BASE_URL_VT")
+
+print(f"API_KEY: {API_KEY}")
+print(f"BASE_URL_VT: {BASE_URL_VT}")
+
 
 class Main(object):
 
