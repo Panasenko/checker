@@ -5,28 +5,21 @@ import re
 import optparse
 import requests
 from dotenv import load_dotenv
+from prettytable import PrettyTable
+import datetime
 
 load_dotenv()
-
-# API_KEY = 'd6c516e8c532da2c8d10062de712d320f4f0b6da7de92b451a358d6617540f0a'
-# BASE_URL_VT = 'https://www.virustotal.com/api/v3/'
 
 API_KEY = os.getenv("API_KEY")
 BASE_URL_VT = os.getenv("BASE_URL_VT")
 
-print(f"API_KEY: {API_KEY}")
-print(f"BASE_URL_VT: {BASE_URL_VT}")
-
-
-class Main(object):
-
+class Main:
     def __init__(self):
         self.option = Options()
         self.ValidIOC = ValidIOC()
         self.start()
 
     def checkList(self, ioc_list):
-
         array_ip_adress = []
         array_domains = []
         array_files = []
@@ -45,21 +38,30 @@ class Main(object):
             else:
                 array_errors.append(results)
 
-
-        # print(len(array_results),len(array_errors))
         return {
             "valid_error": array_errors,
-            "valid_success": [array_files, array_ip_adress, array_domains]
+            "valid_success": { 
+                    "hash": array_files, 
+                    "ip": array_ip_adress, 
+                    "domain": array_domains
+                              }
         }
+        
 
     def start(self):
         file_path = self.option.opt_parser()
         ioc_list = self.ValidIOC.readFile(file_path)
-        print(self.checkList(ioc_list))
+        array_ioc = self.checkList(ioc_list)
+        report = Report(array_ioc)
 
 
-class Options(object):
+        print(report.build_report_ips())
+        print(report.build_report_domains())
+        print(report.build_report_files())
 
+
+
+class Options:
     def opt_parser(self):
         parser = optparse.OptionParser()
         parser.add_option("-f", "--file",
@@ -69,26 +71,21 @@ class Options(object):
 
     def check_input(self, parser):
         options = parser.parse_args()[0]
-
         if not options.file_path:
             mes = "[-] Please specify an interface, use -- help for more info."
             parser.error(mes)
-
         return options.file_path
 
 
-class ValidIOC(object):
-
+class ValidIOC:
     def readFile(self, file_path):
         try:
             with open(file_path, 'r') as file:
                 ioc_list = file.read().splitlines()
                 print('Прочтено %s елементов' %len(ioc_list))
                 return ioc_list
-
         except FileNotFoundError:
             print("Файл не найден!")
-
         except IOError:
             print("Ошибка ввода-вывода!")
 
@@ -97,9 +94,8 @@ class ValidIOC(object):
         return bool(re.fullmatch(ip_pattern, ip))
 
     def validate_hashes(self, hash_value):
-        sha256_pattern = '\b[A-Fa-f0-9]{32}\b|\b[A-Fa-f0-9]{40}\b|\b[A-Fa-f0-9]{64}\b'
-
-        return bool(re.fullmatch(sha256_pattern, hash_value))
+        hash_pattern = r"\b([a-fA-F0-9]{32}|[a-fA-F0-9]{40}|[a-fA-F0-9]{64})\b"
+        return bool(re.fullmatch(hash_pattern, hash_value))
 
     def validate_domain(self, domain):
         domain_pattern = r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
@@ -129,7 +125,6 @@ class ValidIOC(object):
                 "object": VirusTotal.check_domain_vt(option)
             }
             return response
-
         else:
             response = {
                 "status": False,
@@ -139,8 +134,7 @@ class ValidIOC(object):
             return response
 
 
-class VirusTotal(object):
-
+class VirusTotal:
     @staticmethod
     def call_api_virustotal(url):
         
@@ -166,7 +160,6 @@ class VirusTotal(object):
     def check_ip_vt(ip_address):
         url = BASE_URL_VT + '/ip_addresses/' + ip_address
         results = VirusTotal.call_api_virustotal(url)
-
         attr = results['attributes']
         return {
             'check_ip': ip_address,
@@ -206,10 +199,62 @@ class VirusTotal(object):
             'md5': attr['md5'],
             'sha1': attr['sha1'],
             'type_tag': attr['type_tag'],
-            'first_seen_itw_date': attr['first_seen_itw_date'],
             'last_submission_date': attr['last_submission_date'],
             'last_modification_date': attr['last_modification_date']
         }
+
+
+class Report:
+    def __init__(self, array_ioc):
+        self.valid_error = array_ioc['valid_error'] 
+        self.array_files = array_ioc['valid_success']["hash"]
+        self.array_ip_adress = array_ioc['valid_success']['ip']
+        self.array_domains = array_ioc['valid_success']['domain']
+
+    def build_report_ips(self):
+        table = PrettyTable()
+
+        if bool(len(self.array_ip_adress)):
+
+            table.field_names = ["IP adress", "VT malicious", "VT suspicious", "Country", "Whois date",  "VT last analysis date"]
+            array_ip = self.array_ip_adress
+
+            for value in array_ip:
+                v = value["object"]
+                fromated_data = [v["check_ip"], v["last_analise"]["malicious"], v["last_analise"]["suspicious"], v["country"], self.convert_date(v["whois_date"]), self.convert_date(v["last_modification_date"])]
+                table.add_row(fromated_data)
+            return table
+
+
+    def build_report_domains(self):
+        table = PrettyTable()
+
+        if bool(len(self.array_domains)):
+            table.field_names = ["Domain", "VT malicious", "VT suspicious", "DNS record", "Whois date",  "Create date"]
+            array_domains = self.array_domains
+
+            for value in array_domains:
+                v = value["object"]
+                fromated_data = [v["check_domain"], v["last_analise"]["malicious"], v["last_analise"]["suspicious"], self.convert_date(v["last_dns_records_date"]), self.convert_date(v["whois_date"]), self.convert_date(v["creation_date"])]
+                table.add_row(fromated_data)
+            return table
+
+    def build_report_files(self):
+        table = PrettyTable()
+
+        if bool(len(self.array_files)):
+            table.field_names = ["Hash file", "Type tag", "VT malicious", "VT suspicious", "sha256", "Last submission", "Last modification"]
+            array_files = self.array_files
+
+            for value in array_files:
+                v = value["object"]
+                fromated_data = [v["check_hash"], v["type_tag"] , v["last_analise"]["malicious"], v["last_analise"]["suspicious"], v["sha256"], self.convert_date(v["last_submission_date"]), self.convert_date(v["last_modification_date"])]
+                table.add_row(fromated_data)
+            return table
+
+    def convert_date(self, timestamp):
+        value = datetime.datetime.fromtimestamp(timestamp)
+        return value.strftime('%d %B %Y')
 
 
 if __name__ == "__main__":
