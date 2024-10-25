@@ -54,10 +54,10 @@ class Main:
         array_ioc = self.checkList(ioc_list)
         report = Report(array_ioc)
 
-
         print(report.build_report_ips())
         print(report.build_report_domains())
         print(report.build_report_files())
+        print(report.build_report_error())
 
 
 
@@ -251,6 +251,18 @@ class Report:
                 fromated_data = [v["check_hash"], v["type_tag"] , v["last_analise"]["malicious"], v["last_analise"]["suspicious"], v["sha256"], self.convert_date(v["last_submission_date"]), self.convert_date(v["last_modification_date"])]
                 table.add_row(fromated_data)
             return table
+
+
+    def build_report_error(self):
+        table = PrettyTable()
+
+        if bool(len(self.valid_error)):
+            table.field_names = ["Invalid data"]
+
+            for value in self.valid_error:
+                table.add_row([value["object"]])
+            return table
+
 
     def convert_date(self, timestamp):
         value = datetime.datetime.fromtimestamp(timestamp)
