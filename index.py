@@ -160,6 +160,9 @@ class VirusTotal:
     def check_ip_vt(ip_address):
         url = BASE_URL_VT + '/ip_addresses/' + ip_address
         results = VirusTotal.call_api_virustotal(url)
+
+        # TODO: Need make check respons 
+
         attr = results['attributes']
         return {
             'check_ip': ip_address,
@@ -175,6 +178,7 @@ class VirusTotal:
     def check_domain_vt(domain):
         url = BASE_URL_VT + '/domains/' + domain
         results = VirusTotal.call_api_virustotal(url)
+        # TODO: Need make check respons 
         attr = results['attributes']
         return {
             'check_domain': domain,
@@ -191,6 +195,7 @@ class VirusTotal:
     def check_files_vt(file):
         url = BASE_URL_VT + '/files/' + file
         results = VirusTotal.call_api_virustotal(url)
+        # TODO:  Need make check respons 
         attr = results['attributes']
         return {
             'check_hash': file,
