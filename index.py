@@ -29,22 +29,22 @@ class Main:
         while ioc_list:
             results = self.ValidIOC.valid_iocs(ioc_list.pop(0))
 
-            if results['type'] == 'domain' and results["status"]:
+            if results["type"] == "domain" and results["status"]:
                 array_domains.append(results)
-            elif results['type'] == 'ip' and results["status"]:
+            elif results["type"] == "ip" and results["status"]:
                 array_ip_adress.append(results)
-            elif results['type'] == 'hash' and results["status"]:
+            elif results["type"] == "hash" and results["status"]:
                 array_files.append(results)
             else:
                 array_errors.append(results)
 
         return {
             "valid_error": array_errors,
-            "valid_success": { 
-                    "hash": array_files, 
-                    "ip": array_ip_adress, 
-                    "domain": array_domains
-                              }
+            "valid_success": {
+                "hash": array_files,
+                "ip": array_ip_adress,
+                "domain": array_domains,
+            },
         }
         
 
@@ -158,7 +158,8 @@ class VirusTotal:
 
     @staticmethod
     def check_ip_vt(ip_address):
-        url = BASE_URL_VT + '/ip_addresses/' + ip_address
+        # url = BASE_URL_VT + '/ip_addresses/' + ip_address
+        url = f"{BASE_URL_VT}/ip_addresses/{ip_address}"
         results = VirusTotal.call_api_virustotal(url)
 
         # TODO: Need make check respons 
@@ -176,7 +177,8 @@ class VirusTotal:
 
     @staticmethod
     def check_domain_vt(domain):
-        url = BASE_URL_VT + '/domains/' + domain
+        url = f"{BASE_URL_VT}/domains/{domain}"
+        # url = BASE_URL_VT + '/domains/' + domain
         results = VirusTotal.call_api_virustotal(url)
         # TODO: Need make check respons 
         attr = results['attributes']
@@ -193,7 +195,8 @@ class VirusTotal:
 
     @staticmethod
     def check_files_vt(file):
-        url = BASE_URL_VT + '/files/' + file
+        url = f"{BASE_URL_VT}/files/{file}"
+        # url = BASE_URL_VT + '/files/' + file
         results = VirusTotal.call_api_virustotal(url)
         # TODO:  Need make check respons 
         attr = results['attributes']
