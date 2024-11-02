@@ -91,23 +91,22 @@ class RequestBilder:
             super().__init__(indicator)
          
         def get_url(self):
-            # print(f"${super().BASE_URL_VT}")
-            return f"${super().BASE_URL_VT}"
+            return f"{super().BASE_URL_VT}files/{self.indicator}"
 
     class RequestIPAdress(RequestVirusTotal):
         def __init__(self, indicator: str) -> None:
             super().__init__(indicator)
 
         def get_url(self):
-            # print(f"${super().BASE_URL_VT}")
-            return f"${super().BASE_URL_VT}"
+            return f"{super().BASE_URL_VT}ip_addresses/{self.indicator}"
 
     class RequestDomain(RequestVirusTotal):
         def __init__(self, indicator: str) -> None:
             super().__init__(indicator)
+            self.indicator = indicator
 
         def get_url(self):
-            return f"${super().BASE_URL_VT}"
+            return f"{super().BASE_URL_VT}domains/{self.indicator}"
 
     class RequestFactory:
         @staticmethod
