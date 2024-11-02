@@ -4,6 +4,8 @@ import typer
 import sys
 import re
 
+from index import API_KEY
+
 def main(input_file: typer.FileText = typer.Argument(None, help="Входной файл (опционально)")):
     if input_file:
         scheduler(input_file.read())
@@ -17,16 +19,19 @@ def scheduler(content: str):
         ind = Indicators(line)
         print(ind.get_type_indicator())
 
-class Indicators:
-    ip_pattern = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
-    hash_pattern = r"\b([a-fA-F0-9]{32}|[a-fA-F0-9]{40}|[a-fA-F0-9]{64})\b"
-    domain_pattern = r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+class RequesBilder:
+    pass    
 
-    def __init__(self, indicator: str):
+
+class Indicators:
+    IP_PATTERN = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
+    HASH_PATTERN = r"\b([a-fA-F0-9]{32}|[a-fA-F0-9]{40}|[a-fA-F0-9]{64})\b"
+    DOMAIN_PATTERN = r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+
+    def __init__(self, indicator: str) -> None:
         self.indicator = indicator
         self._status_valid = False
         self._type_indicator: str
-        self._data_virustotal: list
 
         self.valid_indicators(self.indicator)
 
@@ -43,13 +48,13 @@ class Indicators:
         self._type_indicator = value
 
     def _validate_ip_adress(self, value) -> bool:
-        return bool(re.fullmatch(self.ip_pattern, value))
+        return bool(re.fullmatch(self.IP_PATTERN, value))
 
     def _validate_hashes(self, value) -> bool:
-        return bool(re.fullmatch(self.hash_pattern, value))
+        return bool(re.fullmatch(self.HASH_PATTERN, value))
 
     def _validate_domain(self, value) -> bool:
-        return bool(re.fullmatch(self.domain_pattern, value))
+        return bool(re.fullmatch(self.DOMAIN_PATTERN, value))
 
     def valid_indicators(self, option: str):
         if self._validate_ip_adress(option):

@@ -1,18 +1,27 @@
-#!bin/python3
+from abc import ABC, abstractmethod
 
-import aiohttp
-import asyncio
+class Animal(ABC):
+    @abstractmethod
+    def speak(self) -> str:
+        pass
 
-async def fetch(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            return await response.text()
+class Dog(Animal):
+    def speak(self) -> str:
+        return "Woof!"
 
-async def main():
-    urls = ['https://example.com', 'https://example.org']
-    tasks = [fetch(url) for url in urls]
-    results = await asyncio.gather(*tasks)
-    for result in results:
-        print(result[:100])  # Печать первых 100 символов ответа
+class Cat(Animal):
+    def speak(self) -> str:
+        return "Meow!"
 
-asyncio.run(main())
+class AnimalFactory:
+    @staticmethod
+    def create_animal(animal_type):
+        if animal_type == "dog":
+            return Dog()
+        elif animal_type == "cat":
+            return Cat()
+        else:
+            raise ValueError("Unknown animal type")
+
+animal = AnimalFactory.create_animal("dog")
+print(animal.speak())  # Woof!
