@@ -22,12 +22,13 @@ def main(input_file: typer.FileText = typer.Argument(None, help="Входной 
 def scheduler(content: str):
     for line in content.splitlines():
         indicator_object = Indicators(line)
-        print(indicator_object.get_status_valid())
 
-        # if not indicator_object.get_status_valid():
-        #     request = RequestBilder(indicator_object)
-        #     i = request.get_object()
-        #     print(i.get_url())
+        if indicator_object.get_status_valid():
+            request = RequestBilder(indicator_object)
+            request_object = request.get_object()
+
+            if request_object is not None:
+                print(request_object.get_url())
 
 class Indicators:
     IP_PATTERN = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
@@ -86,9 +87,12 @@ class RequestBilder:
 
         def get_object(self):
             try:
-                return self.RequestFactory.create_request(self.indicator)
-            except ValueError:
-                logging.error("error")
+                request_object = self.RequestFactory.create_request(self.indicator)
+            except ValueError as e:
+                logging.error(f"Создание обьекта класса RequestFactory заверщилось ошибкой: {e}. Обработка индикатора {self.indicator.get_indicator()}")
+                return None
+            else:
+                return request_object
 
         class RequestVirusTotal(ABC):
 
