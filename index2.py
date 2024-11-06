@@ -7,6 +7,10 @@ import os
 import logging
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
+import aiohttp
+import asyncio
+
+
 #TODO: Расставить логинки по всем методам
 load_dotenv()
 logging.basicConfig(level=logging.ERROR)
@@ -144,6 +148,29 @@ class RequestBilder:
                     return RequestBilder.RequestDomain(indicator.get_indicator())
                 else:
                     raise ValueError("Unknown type of Indicators")
+
+class CallAPI:
+
+    async def fetch(self, url):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    return await response.json()
+        except aiohttp.ClientError as e:
+            print(f"Client error: {e}")
+        except asyncio.TimeoutError:
+            print("Запрос занял слишком много времени")
+
+    async def main():
+        urls = [
+            "https://jsonplaceholder.typicode.com/todos/1",
+            "https://jsonplaceholder.typicode.com/todos/2",
+            "https://jsonplaceholder.typicode.com/todos/3",
+        ]
+        tasks = [self.fetch(url) for url in urls]
+        results = await asyncio.gather(*tasks)
+        for result in results:
+            print(result)
 
 if __name__ == "__main__":
     typer.run(main)
