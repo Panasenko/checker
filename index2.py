@@ -7,7 +7,7 @@ import os
 import logging
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
-
+#TODO: Расставить логинки по всем методам
 load_dotenv()
 logging.basicConfig(level=logging.ERROR)
 
