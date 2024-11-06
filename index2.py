@@ -3,8 +3,13 @@
 import typer
 import sys
 import re
+import os
+import logging
+from abc import ABC, abstractmethod
+from dotenv import load_dotenv
 
-from index import API_KEY
+load_dotenv()
+logging.basicConfig(level=logging.ERROR)
 
 def main(input_file: typer.FileText = typer.Argument(None, help="Входной файл (опционально)")):
     if input_file:
@@ -16,12 +21,13 @@ def main(input_file: typer.FileText = typer.Argument(None, help="Входной 
 
 def scheduler(content: str):
     for line in content.splitlines():
-        ind = Indicators(line)
-        print(ind.get_type_indicator())
+        indicator_object = Indicators(line)
+        print(indicator_object.get_status_valid())
 
-class RequesBilder:
-    pass    
-
+        # if not indicator_object.get_status_valid():
+        #     request = RequestBilder(indicator_object)
+        #     i = request.get_object()
+        #     print(i.get_url())
 
 class Indicators:
     IP_PATTERN = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
@@ -35,11 +41,14 @@ class Indicators:
 
         self.valid_indicators(self.indicator)
 
+    def get_indicator(self) -> str:
+        return self.indicator
+
     def get_status_valid(self) -> bool:
         return self._status_valid
 
     def set_status_valid(self, value: bool):
-        self._statusValid = value
+        self._status_valid = value
 
     def get_type_indicator(self) -> str:
         return self._type_indicator
@@ -71,5 +80,69 @@ class Indicators:
         else:
             self.set_type_indicator("no_valid")
 
+class RequestBilder:
+        def __init__(self, indicator: Indicators):
+            self.indicator = indicator
+
+        def get_object(self):
+            try:
+                return self.RequestFactory.create_request(self.indicator)
+            except ValueError:
+                logging.error("error")
+
+        class RequestVirusTotal(ABC):
+
+            BASE_URL_VT = os.getenv("BASE_URL_VT")
+            HEADER = {
+                'x-apikey': os.getenv("API_KEY"),
+                'accept': 'application/json'
+            }
+
+            def __init__(self, indicator: str) -> None:
+                    self.indicator = indicator
+
+            @abstractmethod
+            def get_url (self) -> str:
+                pass
+
+        class RequestHash(RequestVirusTotal):
+            def __init__(self, indicator: str) -> None:
+                super().__init__(indicator)
+            
+            def get_url(self):
+                return f"{super().BASE_URL_VT}files/{self.indicator}"
+
+        class RequestIPAdress(RequestVirusTotal):
+            def __init__(self, indicator: str) -> None:
+                super().__init__(indicator)
+
+            def get_url(self):
+                return f"{super().BASE_URL_VT}ip_addresses/{self.indicator}"
+
+        class RequestDomain(RequestVirusTotal):
+            def __init__(self, indicator: str) -> None:
+                super().__init__(indicator)
+                self.indicator = indicator
+
+            def get_url(self):
+                return f"{super().BASE_URL_VT}domains/{self.indicator}"
+
+        class RequestFactory:
+            @staticmethod
+            def create_request(indicator: Indicators):
+                if indicator.get_type_indicator() == "hash_file":
+                    return RequestBilder.RequestHash(indicator.get_indicator())
+
+                elif indicator.get_type_indicator() == "ip_address":
+                    return RequestBilder.RequestIPAdress(indicator.get_indicator())
+
+                elif indicator.get_type_indicator() == "domain":
+                    return RequestBilder.RequestDomain(indicator.get_indicator())
+                else:
+                    raise ValueError("Unknown type of Indicators")
+
 if __name__ == "__main__":
     typer.run(main)
+
+
+
