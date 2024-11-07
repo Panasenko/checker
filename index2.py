@@ -24,6 +24,10 @@ def main(input_file: typer.FileText = typer.Argument(None, help="Входной 
         typer.echo("Не предоставлено ни файла, ни данных через stdin.")
 
 def scheduler(content: str):
+
+    array_requests_objects = []
+    array_novalid_objects = []
+
     for line in content.splitlines():
         indicator_object = Indicators(line)
 
@@ -32,7 +36,12 @@ def scheduler(content: str):
             request_object = request.get_object()
 
             if request_object is not None:
-                print(request_object.get_url())
+                array_requests_objects.append(request_object)
+        else:
+            array_novalid_objects.append(indicator_object)
+    print(len(array_novalid_objects))
+    print(len(array_requests_objects))
+
 
 class Indicators:
     IP_PATTERN = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
@@ -101,28 +110,42 @@ class RequestBilder:
         class RequestVirusTotal(ABC):
 
             BASE_URL_VT = os.getenv("BASE_URL_VT")
-            HEADER = {
-                'x-apikey': os.getenv("API_KEY"),
-                'accept': 'application/json'
-            }
+            HEADER = {'x-apikey': os.getenv("API_KEY"), 'accept': 'application/json'}
+            
+            ATTR_REQUEST_HASH = ['last_analise', 'sha256', 'md5','sha1','type_tag','last_submission_date','last_modification_date']
+            ATTR_REQUEST_IP = ['last_analise', 'country', 'whois', 'whois_date','last_analysis_date','last_modification_date']
+            ATTR_REQUEST_DOMAIN = ['last_analise','last_dns_records_date','whois','whois_date','creation_date', 'last_update_date','last_modification_date']
 
             def __init__(self, indicator: str) -> None:
-                    self.indicator = indicator
+                self.indicator = indicator
+                self._response: dict
 
             @abstractmethod
             def get_url (self) -> str:
                 pass
 
+            def set_response(self, response):
+                self._response = response
+
+            def get_response(self) -> dict:
+                return self._response 
+
         class RequestHash(RequestVirusTotal):
             def __init__(self, indicator: str) -> None:
                 super().__init__(indicator)
             
+            def set_response(self, response):
+                self._response = response
+
             def get_url(self):
                 return f"{super().BASE_URL_VT}files/{self.indicator}"
 
         class RequestIPAdress(RequestVirusTotal):
             def __init__(self, indicator: str) -> None:
                 super().__init__(indicator)
+
+            def set_response(self, response):
+                self._response = response
 
             def get_url(self):
                 return f"{super().BASE_URL_VT}ip_addresses/{self.indicator}"
@@ -131,6 +154,9 @@ class RequestBilder:
             def __init__(self, indicator: str) -> None:
                 super().__init__(indicator)
                 self.indicator = indicator
+
+            def set_response(self, response):
+                self._response = response
 
             def get_url(self):
                 return f"{super().BASE_URL_VT}domains/{self.indicator}"
@@ -150,23 +176,25 @@ class RequestBilder:
                     raise ValueError("Unknown type of Indicators")
 
 class CallAPI:
+    
+    def __init__(self, request: RequestBilder) -> None:
+        self.request = request
 
     async def fetch(self, url):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
-                    return await response.json()
+                    if response.status == 200:
+                        data = await response.json()
+                        print(data)
+                    else:
+                        print(f"Ошибка: {response.status}")
         except aiohttp.ClientError as e:
             print(f"Client error: {e}")
         except asyncio.TimeoutError:
             print("Запрос занял слишком много времени")
 
-    async def main():
-        urls = [
-            "https://jsonplaceholder.typicode.com/todos/1",
-            "https://jsonplaceholder.typicode.com/todos/2",
-            "https://jsonplaceholder.typicode.com/todos/3",
-        ]
+    async def caller(self):
         tasks = [self.fetch(url) for url in urls]
         results = await asyncio.gather(*tasks)
         for result in results:
