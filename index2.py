@@ -118,49 +118,57 @@ class RequestBilder:
                 self._response: dict
 
             @abstractmethod
-            def get_url (self) -> str:
+            def get_url(self) -> str:
                 pass
             
             @abstractmethod
-            def get_header (self) -> dict:
+            def get_header(self) -> dict:
                 pass
 
-            def set_response(self, response: dict, attributes: list):
+            def set_response(self, response: dict, fields: list):
                 dict_response = {}
-                if bool(response and attributes):
-                    for item in attributes:
+                if bool(response and fields):
+                    for item in fields:
                         dict_response[item] = response[item]
-
                 self._response = dict_response
 
-            def get_response(self) -> dict:
+            @abstractmethod
+            def get_fields(self) -> list:
+                pass
+
+            def get_response(self)-> dict:
                 return self._response
 
         class RequestHash(RequestVirusTotal):
-            ATTR_REQUEST_HASH = ['last_analysis_stats', 'sha256', 'md5','sha1','type_tag','last_submission_date','last_modification_date']
-
             def __init__(self, indicator: str) -> None:
-                super().__init__(indicator)
-                self.url = f"{super().BASE_URL_VT}files/{self.indicator}"
+                super().__init__(indicator) 
+                self.url = f"{super().BASE_URL_VT}files/{self.indicator}" 
 
-            def set_response_(self, response: dict):
-                super().set_response(response, self.ATTR_REQUEST_HASH)
+            def set_response(self, response: dict, fields: list):
+                super().set_response(response, fields)
 
-            def get_header (self) -> dict:
+            def get_response(self)-> dict:
+                return self._response
+
+            def get_header(self) -> dict:
                 return super().HEADER
 
             def get_url(self) -> str:
                 return self.url
+        
+            def get_fields(self) -> list:
+                return ['last_analysis_stats', 'sha256', 'md5','sha1','type_tag','last_submission_date','last_modification_date']
 
         class RequestIPAdress(RequestVirusTotal):
-            ATTR_REQUEST_IP = ['last_analysis_stats', 'country', 'whois', 'whois_date','last_analysis_date','last_modification_date']
-
             def __init__(self, indicator: str) -> None:
                 super().__init__(indicator)
                 self.url = f"{super().BASE_URL_VT}ip_addresses/{self.indicator}"
 
-            def set_response_(self, response: dict):
-                super().set_response(response, self.ATTR_REQUEST_IP)
+            def set_response(self, response: dict, fields: list):
+                super().set_response(response, fields)
+
+            def get_response(self)-> dict:
+                return self._response
 
             def get_header (self) -> dict:
                 return super().HEADER
@@ -168,21 +176,30 @@ class RequestBilder:
             def get_url(self) -> str:
                 return self.url
 
-        class RequestDomain(RequestVirusTotal):
-            ATTR_REQUEST_DOMAIN = ['last_analysis_stats','last_dns_records_date','whois','whois_date','creation_date', 'last_update_date','last_modification_date']
+            def get_fields(self) -> list:
+                return ['last_analysis_stats', 'country', 'whois', 'whois_date','last_analysis_date','last_modification_date']
 
+
+        class RequestDomain(RequestVirusTotal):
             def __init__(self, indicator: str) -> None:
                 super().__init__(indicator)
                 self.url = f"{super().BASE_URL_VT}domains/{self.indicator}"
 
-            def set_response_(self, response: dict):
-                super().set_response(response, self.ATTR_REQUEST_DOMAIN)
+            def set_response(self, response: dict, fields: list):
+                super().set_response(response, fields)
 
-            def get_header (self) -> dict:
+            def get_response(self)-> dict:
+                return self._response
+
+            def get_header(self) -> dict:
                 return super().HEADER
 
             def get_url(self) -> str:
                 return self.url
+
+            def get_fields(self) -> list:
+                return ['last_analysis_stats','last_dns_records_date','whois','whois_date','creation_date', 'last_update_date','last_modification_date']
+
 
         class RequestFactory:
             @staticmethod
@@ -206,13 +223,15 @@ class CallAPI:
     def get_result(self) -> list:
         return self.result_lst
 
-    async def fetch(self, url: str, headers: dict, results: list):
+    async def fetch(self, obj: RequestBilder.RequestVirusTotal, results: list, fields: list):
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers) as response:
+                async with session.get(obj.get_url(), headers=obj.get_header()) as response:
                     if response.status == 200:
                         data = await response.json()
-                        results.append(data)
+                        res_attr = data["data"]["attributes"]
+                        obj.set_response(res_attr, fields)
+                        results.append(obj.get_response())
                     else:
                         print(f"Ошибка: {response.status}")
         except aiohttp.ClientError as e:
@@ -223,9 +242,8 @@ class CallAPI:
     async def caller(self):
         results = []
         for obj in self.request_obj:
-            await self.fetch(obj.get_url(), obj.get_header(), results)
+            await self.fetch(obj, results, obj.get_fields())
         self.result_lst = results
-
 
 if __name__ == "__main__":
     typer.run(main)
