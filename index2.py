@@ -39,9 +39,11 @@ def scheduler(content: str):
                 array_requests_objects.append(request_object)
         else:
             array_novalid_objects.append(indicator_object)
-    print(len(array_novalid_objects))
-    print(len(array_requests_objects))
 
+    call_api = CallAPI(array_requests_objects)
+    asyncio.run(call_api.caller())
+
+    print(call_api.get_result())
 
 class Indicators:
     IP_PATTERN = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
@@ -108,14 +110,9 @@ class RequestBilder:
                 return request_object
 
         class RequestVirusTotal(ABC):
-
             BASE_URL_VT = os.getenv("BASE_URL_VT")
             HEADER = {'x-apikey': os.getenv("API_KEY"), 'accept': 'application/json'}
             
-            ATTR_REQUEST_HASH = ['last_analise', 'sha256', 'md5','sha1','type_tag','last_submission_date','last_modification_date']
-            ATTR_REQUEST_IP = ['last_analise', 'country', 'whois', 'whois_date','last_analysis_date','last_modification_date']
-            ATTR_REQUEST_DOMAIN = ['last_analise','last_dns_records_date','whois','whois_date','creation_date', 'last_update_date','last_modification_date']
-
             def __init__(self, indicator: str) -> None:
                 self.indicator = indicator
                 self._response: dict
@@ -123,43 +120,69 @@ class RequestBilder:
             @abstractmethod
             def get_url (self) -> str:
                 pass
+            
+            @abstractmethod
+            def get_header (self) -> dict:
+                pass
 
-            def set_response(self, response):
-                self._response = response
+            def set_response(self, response: dict, attributes: list):
+                dict_response = {}
+                if bool(response and attributes):
+                    for item in attributes:
+                        dict_response[item] = response[item]
+
+                self._response = dict_response
 
             def get_response(self) -> dict:
-                return self._response 
+                return self._response
 
         class RequestHash(RequestVirusTotal):
+            ATTR_REQUEST_HASH = ['last_analysis_stats', 'sha256', 'md5','sha1','type_tag','last_submission_date','last_modification_date']
+
             def __init__(self, indicator: str) -> None:
                 super().__init__(indicator)
-            
-            def set_response(self, response):
-                self._response = response
+                self.url = f"{super().BASE_URL_VT}files/{self.indicator}"
 
-            def get_url(self):
-                return f"{super().BASE_URL_VT}files/{self.indicator}"
+            def set_response_(self, response: dict):
+                super().set_response(response, self.ATTR_REQUEST_HASH)
+
+            def get_header (self) -> dict:
+                return super().HEADER
+
+            def get_url(self) -> str:
+                return self.url
 
         class RequestIPAdress(RequestVirusTotal):
+            ATTR_REQUEST_IP = ['last_analysis_stats', 'country', 'whois', 'whois_date','last_analysis_date','last_modification_date']
+
             def __init__(self, indicator: str) -> None:
                 super().__init__(indicator)
+                self.url = f"{super().BASE_URL_VT}ip_addresses/{self.indicator}"
 
-            def set_response(self, response):
-                self._response = response
+            def set_response_(self, response: dict):
+                super().set_response(response, self.ATTR_REQUEST_IP)
 
-            def get_url(self):
-                return f"{super().BASE_URL_VT}ip_addresses/{self.indicator}"
+            def get_header (self) -> dict:
+                return super().HEADER
+
+            def get_url(self) -> str:
+                return self.url
 
         class RequestDomain(RequestVirusTotal):
+            ATTR_REQUEST_DOMAIN = ['last_analysis_stats','last_dns_records_date','whois','whois_date','creation_date', 'last_update_date','last_modification_date']
+
             def __init__(self, indicator: str) -> None:
                 super().__init__(indicator)
-                self.indicator = indicator
+                self.url = f"{super().BASE_URL_VT}domains/{self.indicator}"
 
-            def set_response(self, response):
-                self._response = response
+            def set_response_(self, response: dict):
+                super().set_response(response, self.ATTR_REQUEST_DOMAIN)
 
-            def get_url(self):
-                return f"{super().BASE_URL_VT}domains/{self.indicator}"
+            def get_header (self) -> dict:
+                return super().HEADER
+
+            def get_url(self) -> str:
+                return self.url
 
         class RequestFactory:
             @staticmethod
@@ -176,17 +199,20 @@ class RequestBilder:
                     raise ValueError("Unknown type of Indicators")
 
 class CallAPI:
-    
-    def __init__(self, request: RequestBilder) -> None:
-        self.request = request
+    def __init__(self, request_obj: list) -> None:
+        self.request_obj = request_obj
+        self.result_lst: list
 
-    async def fetch(self, url):
+    def get_result(self) -> list:
+        return self.result_lst
+
+    async def fetch(self, url: str, headers: dict, results: list):
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
+                async with session.get(url, headers=headers) as response:
                     if response.status == 200:
                         data = await response.json()
-                        print(data)
+                        results.append(data)
                     else:
                         print(f"Ошибка: {response.status}")
         except aiohttp.ClientError as e:
@@ -195,10 +221,11 @@ class CallAPI:
             print("Запрос занял слишком много времени")
 
     async def caller(self):
-        tasks = [self.fetch(url) for url in urls]
-        results = await asyncio.gather(*tasks)
-        for result in results:
-            print(result)
+        results = []
+        for obj in self.request_obj:
+            await self.fetch(obj.get_url(), obj.get_header(), results)
+        self.result_lst = results
+
 
 if __name__ == "__main__":
     typer.run(main)
