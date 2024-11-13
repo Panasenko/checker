@@ -5,10 +5,14 @@ import sys
 import re
 import os
 import logging
-from abc import ABC, abstractmethod
-from dotenv import load_dotenv
 import aiohttp
 import asyncio
+import datetime
+
+from abc import ABC, abstractmethod
+from dotenv import load_dotenv
+from rich import print
+from rich.table import Table
 
 
 #TODO: Расставить логинки по всем методам
@@ -32,7 +36,7 @@ def scheduler(content: str):
         indicator_object = Indicators(line)
 
         if indicator_object.get_status_valid():
-            request = RequestBilder(indicator_object)
+            request = RequestBuilder(indicator_object)
             request_object = request.get_object()
 
             if request_object is not None:
@@ -96,8 +100,8 @@ class Indicators:
         else:
             self.set_type_indicator("no_valid")
 
-class RequestBilder:
-        def __init__(self, indicator: Indicators):
+class RequestBuilder:
+        def __init__(self, indicator: Indicators) -> None:
             self.indicator = indicator
 
         def get_object(self):
@@ -179,7 +183,6 @@ class RequestBilder:
             def get_fields(self) -> list:
                 return ['last_analysis_stats', 'country', 'whois', 'whois_date','last_analysis_date','last_modification_date']
 
-
         class RequestDomain(RequestVirusTotal):
             def __init__(self, indicator: str) -> None:
                 super().__init__(indicator)
@@ -200,18 +203,17 @@ class RequestBilder:
             def get_fields(self) -> list:
                 return ['last_analysis_stats','last_dns_records_date','whois','whois_date','creation_date', 'last_update_date','last_modification_date']
 
-
         class RequestFactory:
             @staticmethod
             def create_request(indicator: Indicators):
                 if indicator.get_type_indicator() == "hash_file":
-                    return RequestBilder.RequestHash(indicator.get_indicator())
+                    return RequestBuilder.RequestHash(indicator.get_indicator())
 
                 elif indicator.get_type_indicator() == "ip_address":
-                    return RequestBilder.RequestIPAdress(indicator.get_indicator())
+                    return RequestBuilder.RequestIPAdress(indicator.get_indicator())
 
                 elif indicator.get_type_indicator() == "domain":
-                    return RequestBilder.RequestDomain(indicator.get_indicator())
+                    return RequestBuilder.RequestDomain(indicator.get_indicator())
                 else:
                     raise ValueError("Unknown type of Indicators")
 
@@ -223,7 +225,7 @@ class CallAPI:
     def get_result(self) -> list:
         return self.result_lst
 
-    async def fetch(self, obj: RequestBilder.RequestVirusTotal, results: list, fields: list):
+    async def fetch(self, obj: RequestBuilder.RequestVirusTotal, results: list, fields: list):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(obj.get_url(), headers=obj.get_header()) as response:
@@ -244,6 +246,58 @@ class CallAPI:
         for obj in self.request_obj:
             await self.fetch(obj, results, obj.get_fields())
         self.result_lst = results
+
+class ReportBuilder:
+    def __init__(self) -> None:
+        pass
+
+    class Report:
+        def __init__(self) -> None:
+            self.title="Проверка IoCs",
+            self.title_style="bold green",
+            self.border_style="blue",
+            self.header_style="bold white",
+            self.highlight=True
+
+            self.table = Table()
+            self.table_header: list
+       
+        def create_header(self):
+            pass
+
+
+        def convert_date(self, timestamp):
+            value = datetime.datetime.fromtimestamp(timestamp)
+            return value.strftime('%d %B %Y')
+
+
+
+
+
+
+
+
+
+
+    class ReportHash:
+        pass
+
+    class ReportIP:
+        pass
+
+    class ReportDomain:
+        pass
+        
+    class ReportFactory:
+        pass
+
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
     typer.run(main)
