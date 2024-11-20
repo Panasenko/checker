@@ -132,7 +132,10 @@ class RequestBuilder:
                 dict_response = {}
                 if bool(response and fields):
                     for item in fields:
-                        dict_response[item] = response[item]
+                        if item == "last_analysis_stats":
+                            dict_response.update(response.pop('last_analysis_stats'))
+                        else:
+                            dict_response[item] = response[item]
                 self._response = dict_response
 
             @abstractmethod
@@ -267,15 +270,33 @@ class ReportBuilder:
     class ReportHash(Report):
         def __init__(self) -> None:
             super().__init__(title="Рeзультаты проверки hash суммы файлов")
+            self.default_column_settings = {"style": "cyan", "no_wrap": True}
+            self.field_names = {
+                "check_hash": {"name": "Hash file"}, 
+                "type_tag": {"name": "Type tag"},
+                "malicious": {"name": "VT malicious"},
+                "suspicious": {"name": "VT suspicious"},
+                "sha256": {"name": "sha256"},
+                "last_submission_date": {"name": "Last submission"},
+                "last_modification_date": {"name": "Last modification"}
+            }
+
+
+                # fromated_data = [v["check_hash"], v["type_tag"] , v["last_analise"]["malicious"], v["last_analise"]["suspicious"], v["sha256"], self.convert_date(v["last_submission_date"]), self.convert_date(v["last_modification_date"])]
+        def add_colum(self) -> None:
+            for item in self.field_names:
+                if "name" in self.field_names[item] and self.field_names[item]["name"] is not None:
+                    super().add_column(self.field_names[item]["name"], **self.default_column_settings)
 
     tab = ReportHash()
-    tab.add_column("Имя", style="cyan", no_wrap=True)
+    tab.add_colum()
     tab.add_row("Алиса")
     print(tab)
 
 
 
 
+# new_data = {**data.pop('last_analysis_stats'), **data}
 
 
 
