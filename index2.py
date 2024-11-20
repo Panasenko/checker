@@ -20,6 +20,18 @@ load_dotenv()
 logging.basicConfig(level=logging.ERROR)
 
 def main(input_file: typer.FileText = typer.Argument(None, help="Входной файл (опционально)")):
+    """
+    Main function to read input data from a file or stdin and pass it to the scheduler function.
+
+    Parameters:
+    input_file (typer.FileText): An optional argument representing the input file to read data from.
+
+    Returns:
+    None
+
+    Raises:
+    None
+    """
     if input_file:
         scheduler(input_file.read())
     elif not sys.stdin.isatty():
@@ -32,6 +44,7 @@ def scheduler(content: str):
     array_novalid_objects = []
 
     for line in content.splitlines():
+        
         indicator_object = Indicators(line)
 
         if indicator_object.get_status_valid():
@@ -46,7 +59,7 @@ def scheduler(content: str):
     call_api = CallAPI(array_requests_objects)
     asyncio.run(call_api.caller())
 
-    print(call_api.get_result())
+    print(call_api.__dict__)
 
 class Indicators:
     IP_PATTERN = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
@@ -102,6 +115,9 @@ class Indicators:
 class RequestBuilder:
         def __init__(self, indicator: Indicators) -> None:
             self.indicator = indicator
+
+        def get_indicator(self) -> Indicators:
+            return self.indicator
 
         def get_object(self):
             try:
@@ -254,6 +270,11 @@ class ReportBuilder:
         self.result_lst = result_lst
         self.novalid_lst = novalid_lst
 
+
+    def build_table(self, res_lst: list):
+        for item in res_lst:
+           print() 
+
     def print_table(self, table: Table):
         print(table)
 
@@ -270,33 +291,18 @@ class ReportBuilder:
     class ReportHash(Report):
         def __init__(self) -> None:
             super().__init__(title="Рeзультаты проверки hash суммы файлов")
-            self.default_column_settings = {"style": "cyan", "no_wrap": True}
-            self.field_names = {
-                "check_hash": {"name": "Hash file"}, 
-                "type_tag": {"name": "Type tag"},
-                "malicious": {"name": "VT malicious"},
-                "suspicious": {"name": "VT suspicious"},
-                "sha256": {"name": "sha256"},
-                "last_submission_date": {"name": "Last submission"},
-                "last_modification_date": {"name": "Last modification"}
-            }
 
+        def add_table_column(self) -> None:
+            super().add_column("Type tag")
+            super().add_column("VT malicious")
+            super().add_column("VT suspicious")
+            super().add_column("sha256")
+            super().add_column("Last submission")
+            super().add_column("Last modification")
 
-                # fromated_data = [v["check_hash"], v["type_tag"] , v["last_analise"]["malicious"], v["last_analise"]["suspicious"], v["sha256"], self.convert_date(v["last_submission_date"]), self.convert_date(v["last_modification_date"])]
-        def add_colum(self) -> None:
-            for item in self.field_names:
-                if "name" in self.field_names[item] and self.field_names[item]["name"] is not None:
-                    super().add_column(self.field_names[item]["name"], **self.default_column_settings)
-
-    tab = ReportHash()
-    tab.add_colum()
-    tab.add_row("Алиса")
-    print(tab)
-
-
-
-
-# new_data = {**data.pop('last_analysis_stats'), **data}
+        def add_table_row(self, data):
+            type_tag, malicious, suspicious, sha256, last_submission_date, last_modification_date = data
+            super().add_row(type_tag, malicious, suspicious, sha256, last_submission_date, last_modification_date)
 
 
 
