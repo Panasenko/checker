@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from dotenv import load_dotenv
 from rich import print
 from rich.table import Table
-
+from rich.style import Style
 
 #TODO: Расставить логинки по всем методам
 load_dotenv()
@@ -28,7 +28,6 @@ def main(input_file: typer.FileText = typer.Argument(None, help="Входной 
         typer.echo("Не предоставлено ни файла, ни данных через stdin.")
 
 def scheduler(content: str):
-
     array_requests_objects = []
     array_novalid_objects = []
 
@@ -248,48 +247,31 @@ class CallAPI:
         self.result_lst = results
 
 class ReportBuilder:
-    def __init__(self) -> None:
-        pass
+    def __init__(self, result_lst: CallAPI, novalid_lst: list) -> None:
+        self.result_lst = result_lst
+        self.novalid_lst = novalid_lst
 
-    class Report:
+    def print_table(self, table: Table):
+        print(table)
+
+    class Report(Table):
+        def __init__(self, title="Проверка IoCs") -> None:
+            super().__init__(
+                title=title,
+                title_style=Style(bold=True, color="green"),
+                border_style="blue",
+                header_style=Style(bold=True, color="white"),
+                highlight=True
+            )
+
+    class ReportHash(Report):
         def __init__(self) -> None:
-            self.title="Проверка IoCs",
-            self.title_style="bold green",
-            self.border_style="blue",
-            self.header_style="bold white",
-            self.highlight=True
+            super().__init__(title="Рeзультаты проверки hash суммы файлов")
 
-            self.table = Table()
-            self.table_header: list
-       
-        def create_header(self):
-            pass
-
-
-        def convert_date(self, timestamp):
-            value = datetime.datetime.fromtimestamp(timestamp)
-            return value.strftime('%d %B %Y')
-
-
-
-
-
-
-
-
-
-
-    class ReportHash:
-        pass
-
-    class ReportIP:
-        pass
-
-    class ReportDomain:
-        pass
-        
-    class ReportFactory:
-        pass
+    tab = ReportHash()
+    tab.add_column("Имя", style="cyan", no_wrap=True)
+    tab.add_row("Алиса")
+    print(tab)
 
 
 
