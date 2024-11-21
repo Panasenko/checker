@@ -61,6 +61,10 @@ def scheduler(content: str):
 
     print(call_api.__dict__)
 
+class Task:
+    pass
+
+
 class Indicators:
     IP_PATTERN = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
     HASH_PATTERN = r"\b([a-fA-F0-9]{32}|[a-fA-F0-9]{40}|[a-fA-F0-9]{64})\b"
@@ -116,9 +120,6 @@ class RequestBuilder:
         def __init__(self, indicator: Indicators) -> None:
             self.indicator = indicator
 
-        def get_indicator(self) -> Indicators:
-            return self.indicator
-
         def get_object(self):
             try:
                 request_object = self.RequestFactory.create_request(self.indicator)
@@ -136,10 +137,12 @@ class RequestBuilder:
                 self.indicator = indicator
                 self._response: dict
 
+            @property
             @abstractmethod
             def get_url(self) -> str:
                 pass
             
+            @property
             @abstractmethod
             def get_header(self) -> dict:
                 pass
@@ -154,10 +157,12 @@ class RequestBuilder:
                             dict_response[item] = response[item]
                 self._response = dict_response
 
+            @property
             @abstractmethod
             def get_fields(self) -> list:
                 pass
 
+            @property
             def get_response(self)-> dict:
                 return self._response
 
@@ -169,15 +174,19 @@ class RequestBuilder:
             def set_response(self, response: dict, fields: list):
                 super().set_response(response, fields)
 
+            @property
             def get_response(self)-> dict:
                 return self._response
 
+            @property
             def get_header(self) -> dict:
                 return super().HEADER
 
+            @property
             def get_url(self) -> str:
                 return self.url
         
+            @property
             def get_fields(self) -> list:
                 return ['last_analysis_stats', 'sha256', 'md5','sha1','type_tag','last_submission_date','last_modification_date']
 
@@ -189,15 +198,19 @@ class RequestBuilder:
             def set_response(self, response: dict, fields: list):
                 super().set_response(response, fields)
 
+            @property
             def get_response(self)-> dict:
                 return self._response
 
+            @property
             def get_header (self) -> dict:
                 return super().HEADER
 
+            @property
             def get_url(self) -> str:
                 return self.url
 
+            @property
             def get_fields(self) -> list:
                 return ['last_analysis_stats', 'country', 'whois', 'whois_date','last_analysis_date','last_modification_date']
 
@@ -209,15 +222,19 @@ class RequestBuilder:
             def set_response(self, response: dict, fields: list):
                 super().set_response(response, fields)
 
+            @property
             def get_response(self)-> dict:
                 return self._response
 
+            @property
             def get_header(self) -> dict:
                 return super().HEADER
 
+            @property
             def get_url(self) -> str:
                 return self.url
 
+            @property
             def get_fields(self) -> list:
                 return ['last_analysis_stats','last_dns_records_date','whois','whois_date','creation_date', 'last_update_date','last_modification_date']
 
@@ -246,12 +263,12 @@ class CallAPI:
     async def fetch(self, obj: RequestBuilder.RequestVirusTotal, results: list, fields: list):
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(obj.get_url(), headers=obj.get_header()) as response:
+                async with session.get(obj.get_url, headers=obj.get_header) as response:
                     if response.status == 200:
                         data = await response.json()
                         res_attr = data["data"]["attributes"]
                         obj.set_response(res_attr, fields)
-                        results.append(obj.get_response())
+                        results.append(obj.get_response)
                     else:
                         print(f"Ошибка: {response.status}")
         except aiohttp.ClientError as e:
@@ -262,7 +279,7 @@ class CallAPI:
     async def caller(self):
         results = []
         for obj in self.request_obj:
-            await self.fetch(obj, results, obj.get_fields())
+            await self.fetch(obj, results, obj.get_fields)
         self.result_lst = results
 
 class ReportBuilder:
