@@ -322,18 +322,21 @@ class ReportBuilder:
                 if "hash" not in self.data:
                     self.data["hash"] = self.ReportHash()
                 self.data["hash"].add_table_row(task.response)
+
             elif indicator.type_indicator == "domain":
                 if "domain" not in self.data:
                     self.data["domain"] = self.ReportDomain()
                 self.data["domain"].add_table_row(task.response)
+
             elif indicator.type_indicator == "ip_address":
                 if "ip_address" not in self.data:
                     self.data["ip_address"] = self.ReportsIP()
                 self.data["ip_address"].add_table_row(task.response)
-        print(self.data["ip_address"])
+        self.print_table(self.data)
 
-    def print_table(self, table: Table):
-        print(table)
+    def print_table(self, tables: dict):
+        for table in tables:
+            print(tables[table])
 
     class Report(Table):
 
