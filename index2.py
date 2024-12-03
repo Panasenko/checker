@@ -275,11 +275,11 @@ class Processor:
     @staticmethod
     def main(content: str):
         tasks = Processor.conveyor(content)
-        Processor.call_api(tasks["valid"])
+        res = Processor.call_api(tasks["valid"])
+        print(res[1].response)
 
     @staticmethod
     def conveyor(content: str) -> dict:
-
         valid_objects = []
         novalid_objects = []
 
@@ -303,17 +303,11 @@ class Processor:
     @staticmethod
     def call_api(valid_tasks: list):
         call_api = CallAPI(valid_tasks)
-        res = asyncio.run(call_api.caller())
-        print(res[1].response)
+        return asyncio.run(call_api.caller())
 
 class CallAPI:
     def __init__(self, tasks: list) -> None:
         self.tasks = tasks
-        self.result_lst: list
-
-
-    def get_result(self) -> list:
-        return self.result_lst
 
     async def fetch(self, task: Task, results: list, fields: list):
         try:
@@ -343,12 +337,6 @@ class CallAPI:
                 else:
                     dict_response[item] = response[item]
         return dict_response
-
-    # async def caller(self):
-    #     results = []
-    #     for task in self.tasks:
-    #         await self.fetch(task, results, task.request.get_fields)
-    #     self.result_lst = results
 
     async def caller(self):
         results = []
