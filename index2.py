@@ -326,7 +326,11 @@ class ReportBuilder:
                 if "domain" not in self.data:
                     self.data["domain"] = self.ReportDomain()
                 self.data["domain"].add_table_row(task.response)
-        print(self.data["domain"])
+            elif indicator.type_indicator == "ip_address":
+                if "ip_address" not in self.data:
+                    self.data["ip_address"] = self.ReportsIP()
+                self.data["ip_address"].add_table_row(task.response)
+        print(self.data["ip_address"])
 
     def print_table(self, table: Table):
         print(table)
@@ -394,6 +398,32 @@ class ReportBuilder:
                 self.add_row(domain, str(malicious), str(suspicious), str(last_dns_records_date), str(creation_date))
             except ValueError as e:
                 print(f"Ошибка при добавлении строки: {e}")
+
+
+    class ReportsIP(Report):
+        def __init__(self) -> None:
+            super().__init__(title="Рeзультаты проверки IP адресов")
+            self.add_column("IP adress")
+            self.add_column("VT malicious")
+            self.add_column("VT suspicious")
+            self.add_column("Country")
+            self.add_column("Whois date")
+            self.add_column("VT last analysis date")
+
+        def add_table_row(self, data):
+            try:
+                ip = data.get('ip', '-') ## TODO: добавить определение домена
+                malicious = data.get('malicious', '-')
+                suspicious = data.get('suspicious', '-')
+                country = data.get('country', '-')
+                whois_date = self.convert_date(data.get('whois_date', '-'))
+                last_modification_date = self.convert_date(data.get('last_modification_date', '-'))
+                self.add_row(ip, str(malicious), str(suspicious), str(country), str(whois_date), str(last_modification_date))
+            except ValueError as e:
+                print(f"Ошибка при добавлении строки: {e}")
+
+
+
 if __name__ == "__main__":
     typer.run(main)
 
