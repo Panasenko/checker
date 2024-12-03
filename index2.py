@@ -321,9 +321,12 @@ class ReportBuilder:
             if indicator.type_indicator == "hash_file":
                 if "hash" not in self.data:
                     self.data["hash"] = self.ReportHash()
-
                 self.data["hash"].add_table_row(task.response)
-        print(self.data["hash"])
+            elif indicator.type_indicator == "domain":
+                if "domain" not in self.data:
+                    self.data["domain"] = self.ReportDomain()
+                self.data["domain"].add_table_row(task.response)
+        print(self.data["domain"])
 
     def print_table(self, table: Table):
         print(table)
@@ -372,6 +375,25 @@ class ReportBuilder:
             except ValueError as e:
                 print(f"Ошибка при добавлении строки: {e}")
 
+    class ReportDomain(Report):
+        def __init__(self) -> None:
+            super().__init__(title="Рeзультаты проверки доменов")
+            self.add_column("Domains")
+            self.add_column("VT malicious")
+            self.add_column("VT suspicious")
+            self.add_column("DNS record")
+            self.add_column("Create date")
+
+        def add_table_row(self, data):
+            try:
+                domain = data.get('domain', '-') ## TODO: добавить определение домена
+                malicious = data.get('malicious', '-')
+                suspicious = data.get('suspicious', '-')
+                last_dns_records_date = self.convert_date(data.get('last_dns_records_date', '-'))
+                creation_date = self.convert_date(data.get('creation_date', '-'))
+                self.add_row(domain, str(malicious), str(suspicious), str(last_dns_records_date), str(creation_date))
+            except ValueError as e:
+                print(f"Ошибка при добавлении строки: {e}")
 if __name__ == "__main__":
     typer.run(main)
 
