@@ -65,7 +65,8 @@ class Indicators:
     def type_indicator(self) -> str:
         return self._type_indicator
 
-    def set_type_indicator(self, value: str):
+    @type_indicator.setter
+    def type_indicator(self, value: str):
         self._type_indicator = value
 
     """
@@ -84,17 +85,17 @@ class Indicators:
     def valid_indicators(self, option: str):
         if self._validate_ip_adress(option):
             self.status_valid = True
-            self.set_type_indicator("ip_address")
+            self.type_indicator = "ip_address"
 
         elif self._validate_hashes(option):
             self.status_valid = True
-            self.set_type_indicator("hash_file")
+            self.type_indicator = "hash_file"
 
         elif self._validate_domain(option):
             self.status_valid = True
-            self.set_type_indicator("domain")
+            self.type_indicator = "domain"
         else:
-            self.set_type_indicator("no_valid")
+            self.type_indicator = "no_valid"
 
 """
 Создание запроса в сервис ViruseTotal
@@ -234,8 +235,10 @@ class Processor:
     @staticmethod
     def main(content: str):
         tasks = Processor.conveyor(content)
-        res = Processor.call_api(tasks["valid"])
-        print(res[1].response)
+        task_respons = Processor.call_api(tasks["valid"])
+        # print(res[1].response)
+        ReportBuilder(task_respons, tasks["no_valid"])
+
 
     @staticmethod
     def conveyor(content: str) -> dict:
@@ -297,7 +300,7 @@ class CallAPI:
                     dict_response[item] = response[item]
         return dict_response
 
-    async def caller(self):
+    async def caller(self) -> list:
         results = []
         for task in self.tasks:
             await self.fetch(task, results, task.request.get_fields)
@@ -305,22 +308,33 @@ class CallAPI:
 
 
 class ReportBuilder:
-    def __init__(self, result_lst: CallAPI, novalid_lst: list) -> None:
+    def __init__(self, result_lst: list, novalid_lst: list) -> None:
         self.result_lst = result_lst
         self.novalid_lst = novalid_lst
+        self.build_table(self.result_lst)
 
-    def convert_date(self, timestamp):
-        value = datetime.datetime.fromtimestamp(timestamp)
-        return value.strftime('%d %B %Y')
+    def build_table(self, tasks: list):
+        hash = self.ReportHash()
 
-    # def build_table(self, res_lst: list):
-    #     for item in res_lst:
-    #        print() 
+        for task in tasks:
+            indicator = task.indicator
+            if indicator.type_indicator == "hash_file":
+                print(task.response)
+                hash.add_table_row(task.response)
+        print(hash)
 
     def print_table(self, table: Table):
         print(table)
 
     class Report(Table):
+
+        _instances = {}
+
+        def __new__(cls, *args, **kwargs):
+            if cls not in cls._instances:
+                cls._instances[cls] = object.__new__(cls)
+            return cls._instances[cls]
+
         def __init__(self, title="Проверка IoCs") -> None:
             super().__init__(
                 title=title,
@@ -330,22 +344,31 @@ class ReportBuilder:
                 highlight=True
             )
 
+        def convert_date(self, timestamp):
+            value = datetime.datetime.fromtimestamp(timestamp)
+            return value.strftime('%d %B %Y')
+
     class ReportHash(Report):
         def __init__(self) -> None:
             super().__init__(title="Рeзультаты проверки hash суммы файлов")
-
-        def add_table_column(self) -> None:
-            super().add_column("Type tag")
-            super().add_column("VT malicious")
-            super().add_column("VT suspicious")
-            super().add_column("sha256")
-            super().add_column("Last submission")
-            super().add_column("Last modification")
+            self.add_column("Type tag")
+            self.add_column("VT malicious")
+            self.add_column("VT suspicious")
+            self.add_column("sha256")
+            self.add_column("Last submission")
+            self.add_column("Last modification")
 
         def add_table_row(self, data):
-            type_tag, malicious, suspicious, sha256, last_submission_date, last_modification_date = data
-            super().add_row(type_tag, malicious, suspicious, sha256, last_submission_date, last_modification_date)
-
+            try:
+                type_tag = data.get('type_tag', '-')
+                malicious = data.get('malicious', '-')
+                suspicious = data.get('suspicious', '-')
+                sha256 = data.get('sha256', '-')
+                last_submission_date = self.convert_date(data.get('last_submission_date', '-'))
+                last_modification_date = self.convert_date(data.get('last_modification_date', '-'))
+                self.add_row(type_tag, str(malicious), str(suspicious), sha256, str(last_submission_date), str(last_modification_date))
+            except ValueError as e:
+                print(f"Ошибка при добавлении строки: {e}")
 
 if __name__ == "__main__":
     typer.run(main)
