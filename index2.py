@@ -26,54 +26,13 @@ def main(input_file: typer.FileText = typer.Argument(None, help="Входной 
 
     Parameters:
     input_file (typer.FileText): An optional argument representing the input file to read data from.
-
-    Returns:
-    None
-
-    Raises:
-    None
     """
-
-
     if input_file:
         Processor.main(input_file.read())
     elif not sys.stdin.isatty():
         Processor.main(sys.stdin.read())
     else:
         typer.echo("Не предоставлено ни файла, ни данных через stdin.")
-
-
-
-
-    # if input_file:
-    #     scheduler(input_file.read())
-    # elif not sys.stdin.isatty():
-    #     scheduler(sys.stdin.read())
-    # else:
-    #     typer.echo("Не предоставлено ни файла, ни данных через stdin.")
-
-# def scheduler(content: str):
-#     array_requests_objects = []
-#     array_novalid_objects = []
-#
-#     for line in content.splitlines():
-#
-#         indicator_object = Indicators(line)
-#
-#         if indicator_object.status_valid:
-#             request = RequestBuilder(indicator_object)
-#             request_object = request.get_object()
-#
-#             if request_object is not None:
-#                 array_requests_objects.append(request_object)
-#         else:
-#             array_novalid_objects.append(indicator_object)
-#
-#     call_api = CallAPI(array_requests_objects)
-#     asyncio.run(call_api.caller())
-#
-#     print(call_api.__dict__)
-#
 
 class Indicators:
     IP_PATTERN = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
