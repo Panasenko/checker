@@ -311,17 +311,19 @@ class ReportBuilder:
     def __init__(self, result_lst: list, novalid_lst: list) -> None:
         self.result_lst = result_lst
         self.novalid_lst = novalid_lst
+        self.data = {}
         self.build_table(self.result_lst)
 
     def build_table(self, tasks: list):
-        hash = self.ReportHash()
 
         for task in tasks:
-            indicator = task.indicator
+            indicator = getattr(task, "indicator")
             if indicator.type_indicator == "hash_file":
-                print(task.response)
-                hash.add_table_row(task.response)
-        print(hash)
+                if "hash" not in self.data:
+                    self.data["hash"] = self.ReportHash()
+
+                self.data["hash"].add_table_row(task.response)
+        print(self.data["hash"])
 
     def print_table(self, table: Table):
         print(table)
