@@ -2,3 +2,4 @@ env
 .git
 .env
 filename.txt
+build/
