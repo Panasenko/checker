@@ -278,8 +278,8 @@ class CallAPI:
                     async with session.get(task.request.get_url, headers=task.request.get_header) as response:
                         if response.status == 200:
                             data = await response.json()
-                            res_attr = data["data"]["attributes"]
-                            task.response = self.set_response(res_attr, fields)
+                            # res_attr = data["data"]["attributes"]
+                            task.response = self.set_response(data["data"], fields)
                             results.append(task)
                         else:
                             print(f"Ошибка: {response.status}")
@@ -293,11 +293,14 @@ class CallAPI:
     def set_response(self, response: dict, fields: list) -> dict:
         dict_response = {}
         if bool(response and fields):
+            dict_response["ioc"] = response.get('id', '-')
+            dict_response["type"] = response.get('type', '-')
+
             for item in fields:
                 if item == "last_analysis_stats":
-                    dict_response.update(response.pop('last_analysis_stats'))
+                    dict_response.update(response["attributes"].pop('last_analysis_stats'))
                 else:
-                    dict_response[item] = response[item]
+                    dict_response[item] = response["attributes"][item]
         return dict_response
 
     async def caller(self) -> list:
@@ -363,29 +366,33 @@ class ReportBuilder:
     class ReportHash(Report):
         def __init__(self) -> None:
             super().__init__(title="Рeзультаты проверки hash суммы файлов")
+            self.add_column("IoC")
+            self.add_column("Type")
             self.add_column("Type tag")
             self.add_column("VT malicious")
             self.add_column("VT suspicious")
-            self.add_column("sha256")
+            self.add_column("Sha256")
             self.add_column("Last submission")
             self.add_column("Last modification")
 
         def add_table_row(self, data):
             try:
+                ioc = data.get('ioc', '-')
+                type_ioc = data.get('type', '-')
                 type_tag = data.get('type_tag', '-')
                 malicious = data.get('malicious', '-')
                 suspicious = data.get('suspicious', '-')
                 sha256 = data.get('sha256', '-')
                 last_submission_date = self.convert_date(data.get('last_submission_date', '-'))
                 last_modification_date = self.convert_date(data.get('last_modification_date', '-'))
-                self.add_row(type_tag, str(malicious), str(suspicious), sha256, str(last_submission_date), str(last_modification_date))
+                self.add_row(str(ioc),str(type_ioc), str(type_tag), str(malicious), str(suspicious), str(sha256), str(last_submission_date), str(last_modification_date))
             except ValueError as e:
                 print(f"Ошибка при добавлении строки: {e}")
 
     class ReportDomain(Report):
         def __init__(self) -> None:
             super().__init__(title="Рeзультаты проверки доменов")
-            self.add_column("Domains")
+            self.add_column("ioc")
             self.add_column("VT malicious")
             self.add_column("VT suspicious")
             self.add_column("DNS record")
@@ -393,12 +400,13 @@ class ReportBuilder:
 
         def add_table_row(self, data):
             try:
-                domain = data.get('domain', '-') ## TODO: добавить определение домена
+                ioc = data.get('ioc', '-')
+                type_ioc = data.get('type', '-')
                 malicious = data.get('malicious', '-')
                 suspicious = data.get('suspicious', '-')
                 last_dns_records_date = self.convert_date(data.get('last_dns_records_date', '-'))
                 creation_date = self.convert_date(data.get('creation_date', '-'))
-                self.add_row(domain, str(malicious), str(suspicious), str(last_dns_records_date), str(creation_date))
+                self.add_row(str(ioc),str(type_ioc), str(malicious), str(suspicious), str(last_dns_records_date), str(creation_date))
             except ValueError as e:
                 print(f"Ошибка при добавлении строки: {e}")
 
@@ -406,7 +414,7 @@ class ReportBuilder:
     class ReportsIP(Report):
         def __init__(self) -> None:
             super().__init__(title="Рeзультаты проверки IP адресов")
-            self.add_column("IP adress")
+            self.add_column("ioc")
             self.add_column("VT malicious")
             self.add_column("VT suspicious")
             self.add_column("Country")
@@ -415,13 +423,14 @@ class ReportBuilder:
 
         def add_table_row(self, data):
             try:
-                ip = data.get('ip', '-') ## TODO: добавить определение домена
+                ioc = data.get('ioc', '-')
+                type_ioc = data.get('type', '-')
                 malicious = data.get('malicious', '-')
                 suspicious = data.get('suspicious', '-')
                 country = data.get('country', '-')
                 whois_date = self.convert_date(data.get('whois_date', '-'))
                 last_modification_date = self.convert_date(data.get('last_modification_date', '-'))
-                self.add_row(ip, str(malicious), str(suspicious), str(country), str(whois_date), str(last_modification_date))
+                self.add_row(str(ioc),str(type_ioc), str(malicious), str(suspicious), str(country), str(whois_date), str(last_modification_date))
             except ValueError as e:
                 print(f"Ошибка при добавлении строки: {e}")
 
