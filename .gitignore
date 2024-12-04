@@ -5,3 +5,4 @@ filename.txt
 build/
 index.spec
 vtchecker.spec
+checker.spec
