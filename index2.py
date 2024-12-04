@@ -201,12 +201,16 @@ class RequestBuilder:
                     raise ValueError("Unknown type of Indicators")
 
 class Task:
-    def __init__(self, ioc) -> None:
+    def __init__(self, ioc: str) -> None:
         self._ioc = ioc
         self._indicator: Indicators
         self._request: Union[RequestBuilder.RequestHash, RequestBuilder.RequestIPAdress, RequestBuilder.RequestDomain, None]
         self._response: dict
     
+    @property
+    def ioc(self) -> str:
+        return self._ioc
+
     @property
     def indicator(self) -> Indicators:
         return self._indicator
@@ -236,9 +240,7 @@ class Processor:
     def main(content: str):
         tasks = Processor.conveyor(content)
         task_respons = Processor.call_api(tasks["valid"])
-        # print(res[1].response)
         ReportBuilder(task_respons, tasks["no_valid"])
-
 
     @staticmethod
     def conveyor(content: str) -> dict:
@@ -247,7 +249,7 @@ class Processor:
 
         for line in content.splitlines():
             """Создание обьекта задачи"""
-            task = Task(list)
+            task = Task(line)
 
             """Валидация индикаторов компрометации"""
             task.indicator = Indicators(line)
@@ -277,8 +279,7 @@ class CallAPI:
                 if task.request:
                     async with session.get(task.request.get_url, headers=task.request.get_header) as response:
                         if response.status == 200:
-                            data = await response.json()
-                            # res_attr = data["data"]["attributes"]
+                            data = await response.json() ## TODO: сделать проверку не найденых на VT
                             task.response = self.set_response(data["data"], fields)
                             results.append(task)
                         else:
@@ -309,18 +310,19 @@ class CallAPI:
             await self.fetch(task, results, task.request.get_fields)
         return results
 
-
 class ReportBuilder:
     def __init__(self, result_lst: list, novalid_lst: list) -> None:
         self.result_lst = result_lst
         self.novalid_lst = novalid_lst
         self.data = {}
+        self.no_valid_data = None
         self.build_table(self.result_lst)
+        self.build_table_novalid(self.novalid_lst)
 
     def build_table(self, tasks: list):
-
         for task in tasks:
             indicator = getattr(task, "indicator")
+
             if indicator.type_indicator == "hash_file":
                 if "hash" not in self.data:
                     self.data["hash"] = self.ReportHash()
@@ -336,6 +338,14 @@ class ReportBuilder:
                     self.data["ip_address"] = self.ReportsIP()
                 self.data["ip_address"].add_table_row(task.response)
         self.print_table(self.data)
+
+    def build_table_novalid(self, tasks: list):
+        if len(tasks):
+            for task in tasks:
+                if self.no_valid_data is None:
+                    self.no_valid_data = self.ReportsNoValids()
+                self.no_valid_data.add_table_row(task.ioc)
+            print(self.no_valid_data)
 
     def print_table(self, tables: dict):
         for table in tables:
@@ -375,9 +385,9 @@ class ReportBuilder:
             self.add_column("Last submission")
             self.add_column("Last modification")
 
-        def add_table_row(self, data):
+        def add_table_row(self, data: dict):
             try:
-                ioc = data.get('ioc', '-')
+                ioc = data.get('ioc', '-') ## TODO: сделать получение изначально отправленных данных
                 type_ioc = data.get('type', '-')
                 type_tag = data.get('type_tag', '-')
                 malicious = data.get('malicious', '-')
@@ -393,12 +403,13 @@ class ReportBuilder:
         def __init__(self) -> None:
             super().__init__(title="Рeзультаты проверки доменов")
             self.add_column("ioc")
+            self.add_column("Type")
             self.add_column("VT malicious")
             self.add_column("VT suspicious")
             self.add_column("DNS record")
             self.add_column("Create date")
 
-        def add_table_row(self, data):
+        def add_table_row(self, data: dict):
             try:
                 ioc = data.get('ioc', '-')
                 type_ioc = data.get('type', '-')
@@ -409,7 +420,6 @@ class ReportBuilder:
                 self.add_row(str(ioc),str(type_ioc), str(malicious), str(suspicious), str(last_dns_records_date), str(creation_date))
             except ValueError as e:
                 print(f"Ошибка при добавлении строки: {e}")
-
 
     class ReportsIP(Report):
         def __init__(self) -> None:
@@ -434,7 +444,16 @@ class ReportBuilder:
             except ValueError as e:
                 print(f"Ошибка при добавлении строки: {e}")
 
+    class ReportsNoValids(Report):
+        def __init__(self) -> None:
+            super().__init__(title="Данные не прошедшие валидацию")
+            self.add_column("ioc")
 
+        def add_table_row(self, data: str):
+            try:
+                self.add_row(data)
+            except ValueError as e:
+                print(f"Ошибка при добавлении строки: {e}")
 
 if __name__ == "__main__":
     typer.run(main)
