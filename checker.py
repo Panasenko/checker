@@ -17,9 +17,11 @@ from rich.style import Style
 from rich.progress import Progress
 from rich.console import Console
 from rich.logging import RichHandler
-
 from typing import Union
-load_dotenv()
+
+"""
+Настройки логирования
+"""
 logging.basicConfig(
     # level="NOTSET",
     format="%(message)s",
@@ -28,6 +30,22 @@ logging.basicConfig(
 )
 log = logging.getLogger("rich")
 
+"""
+Проверка обязательных параметров получаемых из окружения
+"""
+load_dotenv()
+
+BASE_URL_VT = os.getenv("BASE_URL_VT") or 'https://www.virustotal.com/api/v3/'
+if os.getenv("API_KEY") is None:
+    log.error("[bold red]На вход не переданы данные![/]", extra={"markup": True})
+    sys.exit(1)
+
+API_KEY_VT = os.getenv("API_KEY") 
+
+
+"""
+Блок получения индикаторов компрометации из потока данных
+"""
 def main(input_file: typer.FileText = typer.Argument(None, help="Входной файл (опционально)")):
     """
     Main function to read input data from a file or stdin and pass it to the scheduler function.
@@ -35,17 +53,29 @@ def main(input_file: typer.FileText = typer.Argument(None, help="Входной 
     Parameters:
     input_file (typer.FileText): An optional argument representing the input file to read data from.
     """
-    if input_file is not None:
-        Processor.main(input_file.read())
-    elif not sys.stdin.isatty():
-        Processor.main(sys.stdin.read())
-    else:
-        log.error("[bold red blink]На вход не переданы данные![/]", extra={"markup": True})
+    try:
+        if input_file is not None:
+            Processor.main(input_file.read())
+        elif not sys.stdin.isatty():
+            Processor.main(sys.stdin.read())
+        else:
+            log.error("[bold red]На вход не переданы данные![/]", extra={"markup": True})
+    except KeyboardInterrupt:
+        log.error("[bold red]Программа прервана пользователем.[/]", extra={"markup": True})
+        sys.exit(1)
+    except FileNotFoundError as e:
+        log.error(f"[bold red]Файл не найден: {e}[/]", extra={"markup": True})
+        sys.exit(1)
+    except Exception as e:
+        log.error(f"[bold red blink]Необработанная ошибка: {e}[/]", extra={"markup": True})
+        sys.exit(1)
 
 class Indicators:
     IP_PATTERN = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
     HASH_PATTERN = r"\b([a-fA-F0-9]{32}|[a-fA-F0-9]{40}|[a-fA-F0-9]{64})\b"
-    DOMAIN_PATTERN = r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+    # DOMAIN_PATTERN = r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+    DOMAIN_PATTERN = r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?<!\.(?:txt|exe|jpg|png|pdf))$'
+
 
     def __init__(self, indicator: str) -> None:
         self.indicator = indicator
@@ -311,20 +341,26 @@ class CallAPI:
                             task.found = False
                             log.info(f"Индикатор компрометации {task.ioc} не найден в базе VirusTotal")
                             results.append(task)
+                        elif response.status == 400:
+                            task.found = False
+                            log.error(f"Bad Request 400: Текса запроса {task.request.get_url}")
+                            results.append(task)
                         elif response.status == 429:
                             task.found = False
                             log.error("[bold red blink]Превышен суточный лимит проверок в VirusTotal[/]", extra={"markup": True})
                             results.append(task)
                         else:
-                            log.error(f"[bold red blink]Во время вызова API возникла ошибка: {response.status}[/]", extra={"markup": True})
+                            print(task.request.get_url)
+                            log.error(f"[bold red]Во время вызова API возникла ошибка: {response.status}[/]", extra={"markup": True})
                 else:
-                    log.error("[bold red blink]В обьекте Task отсутствует сформированный обьект зазпрос[/]", extra={"markup": True})
+                    log.error("[bold red]В обьекте Task отсутствует сформированный обьект зазпрос[/]", extra={"markup": True})
         except aiohttp.ClientError as e:
             log.error(f"[bold red blink]Client error: {e}[/]", extra={"markup": True})
         except asyncio.TimeoutError:
-            log.error("[bold red blink]Запрос занял слишком много времени[/]", extra={"markup": True})
+            log.error("[bold red]Запрос занял слишком много времени[/]", extra={"markup": True})
 
     def set_response(self, response: dict, fields: list, task: Task) -> dict:
+        ## TODO: check error
         dict_response = {}
         if bool(response and fields):
             dict_response["ioc"] = task.ioc
@@ -334,7 +370,7 @@ class CallAPI:
                 if item == "last_analysis_stats":
                     dict_response.update(response["attributes"].pop('last_analysis_stats'))
                 else:
-                    dict_response[item] = response["attributes"][item]
+                    dict_response[item] = response["attributes"].get(item, '-')
         return dict_response
 
     async def caller(self) -> list:
@@ -523,6 +559,4 @@ class ReportBuilder:
 
 if __name__ == "__main__":
     typer.run(main)
-
-
 

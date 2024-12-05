@@ -6,3 +6,4 @@ build/
 index.spec
 vtchecker.spec
 checker.spec
+script.sh
