@@ -15,11 +15,18 @@ from rich import print
 from rich.table import Table
 from rich.style import Style
 from rich.progress import Progress
+from rich.console import Console
+from rich.logging import RichHandler
 
 from typing import Union
-#TODO: Расставить логинки по всем методам
 load_dotenv()
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(
+    # level="NOTSET",
+    format="%(message)s",
+    datefmt="[%X]",
+    handlers=[RichHandler(rich_tracebacks=False)]
+)
+log = logging.getLogger("rich")
 
 def main(input_file: typer.FileText = typer.Argument(None, help="Входной файл (опционально)")):
     """
@@ -28,12 +35,12 @@ def main(input_file: typer.FileText = typer.Argument(None, help="Входной 
     Parameters:
     input_file (typer.FileText): An optional argument representing the input file to read data from.
     """
-    if input_file:
+    if input_file is not None:
         Processor.main(input_file.read())
     elif not sys.stdin.isatty():
         Processor.main(sys.stdin.read())
     else:
-        typer.echo("Не предоставлено ни файла, ни данных через stdin.")
+        log.error("[bold red blink]На вход не переданы данные![/]", extra={"markup": True})
 
 class Indicators:
     IP_PATTERN = r'^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
@@ -182,7 +189,7 @@ class RequestBuilder:
             try:
                 request_object = self.RequestFactory.create_request(self.indicator)
             except ValueError as e:
-                logging.error(f"Создание обьекта класса RequestFactory заверщилось ошибкой: {e}. Обработка индикатора {self.indicator.get_indicator}")
+                log.error(f"[bold red blink]Создание обьекта класса RequestFactory заверщилось ошибкой: {e}.[/]", extra={"markup": True})
                 return None
             else:
                 return request_object
@@ -199,6 +206,7 @@ class RequestBuilder:
                 elif indicator.type_indicator == "domain":
                     return RequestBuilder.RequestDomain(indicator.get_indicator)
                 else:
+                    log.error("[bold red blink]Получен неизвестный тип инидикатора компрометации[/]", extra={"markup": True})
                     raise ValueError("Unknown type of Indicators")
 
 class Task:
@@ -296,25 +304,30 @@ class CallAPI:
                     async with session.get(task.request.get_url, headers=task.request.get_header) as response:
                         if response.status == 200:
                             data = await response.json()
-                            task.response = self.set_response(data["data"], fields)
+                            task.response = self.set_response(data["data"], fields, task)
                             task.found = True
                             results.append(task)
                         elif response.status == 404:
                             task.found = False
+                            log.info(f"Индикатор компрометации {task.ioc} не найден в базе VirusTotal")
+                            results.append(task)
+                        elif response.status == 429:
+                            task.found = False
+                            log.error("[bold red blink]Превышен суточный лимит проверок в VirusTotal[/]", extra={"markup": True})
                             results.append(task)
                         else:
-                            print(f"Ошибка: {response.status}")
+                            log.error(f"[bold red blink]Во время вызова API возникла ошибка: {response.status}[/]", extra={"markup": True})
                 else:
-                    print("В обьекте Task отсутствует сформированный обьект зазпрос")
+                    log.error("[bold red blink]В обьекте Task отсутствует сформированный обьект зазпрос[/]", extra={"markup": True})
         except aiohttp.ClientError as e:
-            print(f"Client error: {e}")
+            log.error(f"[bold red blink]Client error: {e}[/]", extra={"markup": True})
         except asyncio.TimeoutError:
-            print("Запрос занял слишком много времени")
+            log.error("[bold red blink]Запрос занял слишком много времени[/]", extra={"markup": True})
 
-    def set_response(self, response: dict, fields: list) -> dict:
+    def set_response(self, response: dict, fields: list, task: Task) -> dict:
         dict_response = {}
         if bool(response and fields):
-            dict_response["ioc"] = response.get('id', '-')
+            dict_response["ioc"] = task.ioc
             dict_response["type"] = response.get('type', '-')
 
             for item in fields:
@@ -326,10 +339,9 @@ class CallAPI:
 
     async def caller(self) -> list:
         results = []
-        count_tasks = len(self.tasks)
 
         with Progress() as progress:
-            task_progress = progress.add_task("Чтение данных из потока ввода...", total=count_tasks)
+            task_progress = progress.add_task("Вызов API VirusTotal", total=len(self.tasks))
 
             for task in self.tasks:
                 progress.update(task_progress, advance=1)
@@ -342,6 +354,7 @@ class ReportBuilder:
         self.novalid_lst = novalid_lst
         self.data = {}
         self.no_valid_data = None
+
         self.build_table(self.result_lst)
         self.build_table_novalid(self.novalid_lst)
 
@@ -364,6 +377,7 @@ class ReportBuilder:
                 if "ip_address" not in self.data:
                     self.data["ip_address"] = self.ReportsIP()
                 self.data["ip_address"].add_table_row(task.response)
+                
             elif not task.found:
                 if "no_found" not in self.data:
                     self.data["no_found"] = self.ReportsNotFound()
@@ -384,7 +398,6 @@ class ReportBuilder:
             print(tables[table])
 
     class Report(Table):
-
         _instances = {}
 
         def __new__(cls, *args, **kwargs):
@@ -399,19 +412,24 @@ class ReportBuilder:
                 border_style="blue",
                 header_style=Style(bold=True, color="white"),
                 highlight=True,
-                width=200
+                width=Console().width
             )
 
         def convert_date(self, timestamp):
             value = datetime.datetime.fromtimestamp(timestamp)
             return value.strftime('%d %B %Y')
 
+        def check_score(self, score):
+            if score > 0:
+                return f"[black on red]     {score}     [/black on red]"
+            return f"[black on green]     {score}     [/black on green]"
+
     class ReportHash(Report):
         def __init__(self) -> None:
             super().__init__(title="Рeзультаты проверки hash суммы файлов")
             self.add_column("IoC")
-            self.add_column("Type")
-            self.add_column("Type tag")
+            self.add_column("Type", justify="center")
+            self.add_column("Type tag", justify="center")
             self.add_column("VT malicious")
             self.add_column("VT suspicious")
             self.add_column("Sha256")
@@ -420,25 +438,26 @@ class ReportBuilder:
 
         def add_table_row(self, data: dict):
             try:
-                ioc = data.get('ioc', '-') ## TODO: сделать получение изначально отправленных данных
+                ioc = data.get('ioc', '-')
                 type_ioc = data.get('type', '-')
                 type_tag = data.get('type_tag', '-')
-                malicious = data.get('malicious', '-')
-                suspicious = data.get('suspicious', '-')
+                malicious = self.check_score(data.get('malicious', '-'))
+                suspicious = self.check_score(data.get('suspicious', '-'))
                 sha256 = data.get('sha256', '-')
                 last_submission_date = self.convert_date(data.get('last_submission_date', '-'))
                 last_modification_date = self.convert_date(data.get('last_modification_date', '-'))
                 self.add_row(str(ioc),str(type_ioc), str(type_tag), str(malicious), str(suspicious), str(sha256), str(last_submission_date), str(last_modification_date))
             except ValueError as e:
-                print(f"Ошибка при добавлении строки: {e}")
+                log.error(f"[bold red blink]Ошибка при добавлении строки: {e}[/]", extra={"markup": True})
 
     class ReportDomain(Report):
         def __init__(self) -> None:
             super().__init__(title="Рeзультаты проверки доменов")
-            self.add_column("ioc")
-            self.add_column("Type")
-            self.add_column("VT malicious")
-            self.add_column("VT suspicious")
+            self.add_column("IoC")
+            self.add_column("Type", justify="center")
+            self.add_column("VT malicious", justify="center")
+            self.add_column("VT suspicious", justify="center")
+            self.add_column("Whois date")
             self.add_column("DNS record")
             self.add_column("Create date")
 
@@ -446,18 +465,21 @@ class ReportBuilder:
             try:
                 ioc = data.get('ioc', '-')
                 type_ioc = data.get('type', '-')
-                malicious = data.get('malicious', '-')
-                suspicious = data.get('suspicious', '-')
+                malicious = self.check_score(data.get('malicious', '-'))
+                suspicious = self.check_score(data.get('suspicious', '-'))
+                whois_date = self.convert_date(data.get('whois_date', '-'))
+
                 last_dns_records_date = self.convert_date(data.get('last_dns_records_date', '-'))
                 creation_date = self.convert_date(data.get('creation_date', '-'))
-                self.add_row(str(ioc),str(type_ioc), str(malicious), str(suspicious), str(last_dns_records_date), str(creation_date))
+                self.add_row(str(ioc),str(type_ioc), str(malicious), str(suspicious), str(whois_date), str(last_dns_records_date), str(creation_date))
             except ValueError as e:
-                print(f"Ошибка при добавлении строки: {e}")
+                log.error(f"[bold red blink]Ошибка при добавлении строки: {e}[/]", extra={"markup": True})
 
     class ReportsIP(Report):
         def __init__(self) -> None:
             super().__init__(title="Рeзультаты проверки IP адресов")
-            self.add_column("ioc")
+            self.add_column("IoC")
+            self.add_column("Type")
             self.add_column("VT malicious")
             self.add_column("VT suspicious")
             self.add_column("Country")
@@ -468,36 +490,36 @@ class ReportBuilder:
             try:
                 ioc = data.get('ioc', '-')
                 type_ioc = data.get('type', '-')
-                malicious = data.get('malicious', '-')
-                suspicious = data.get('suspicious', '-')
+                malicious = self.check_score(data.get('malicious', '-'))
+                suspicious = self.check_score(data.get('suspicious', '-'))
                 country = data.get('country', '-')
                 whois_date = self.convert_date(data.get('whois_date', '-'))
                 last_modification_date = self.convert_date(data.get('last_modification_date', '-'))
                 self.add_row(str(ioc),str(type_ioc), str(malicious), str(suspicious), str(country), str(whois_date), str(last_modification_date))
             except ValueError as e:
-                print(f"Ошибка при добавлении строки: {e}")
+                log.error(f"[bold red blink]Ошибка при добавлении строки: {e}[/]", extra={"markup": True})
 
     class ReportsNotFound(Report):
         def __init__(self) -> None:
             super().__init__(title="Данные не обнаружены в ViruseTotal")
-            self.add_column("ioc")
+            self.add_column("IoC")
 
         def add_table_row(self, data: str):
             try:
                 self.add_row(data)
             except ValueError as e:
-                print(f"Ошибка при добавлении строки: {e}")
+                log.error(f"[bold red blink]Ошибка при добавлении строки: {e}[/]", extra={"markup": True})
 
     class ReportsNoValids(Report):
         def __init__(self) -> None:
             super().__init__(title="Данные не прошедшие валидацию")
-            self.add_column("ioc")
+            self.add_column("IoC")
 
         def add_table_row(self, data: str):
             try:
                 self.add_row(data)
             except ValueError as e:
-                print(f"Ошибка при добавлении строки: {e}")
+                log.error(f"[bold red blink]Ошибка при добавлении строки: {e}[/]", extra={"markup": True})
 
 if __name__ == "__main__":
     typer.run(main)
